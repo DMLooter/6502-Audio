@@ -1,0 +1,3 @@
+./vasm6502_oldstyle -Fbin -dotdir -wdc02 LCD.s
+hexdump -C a.out
+minipro -p AT28C256 -w a.output
