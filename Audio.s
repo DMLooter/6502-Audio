@@ -16,8 +16,6 @@ BYTELOC = $1002 ; the location where the currently sending byte is stored
 
 SIDMIDILOOKUP = $f000
 SNMIDILOOKUP = $f100
-REGLOOKUP = $f200
-VOLLOOKUP = $f208
 
 ; Channel layout:
 ; SID 1-3 : 0 - 2
@@ -47,21 +45,13 @@ reset:
 	lda #3
 	sta CHANNELLOC
 
-	lda #%11100001
+	lda #%10000111
 	sta BYTELOC
 	jsr write_byte_SN1
 
-	lda #%00000100
+	lda #%00100000
 	sta BYTELOC
 	jsr write_byte_SN1
-
-	lda #%11100001
-	sta BYTELOC
-	jsr write_byte_SN2
-
-	lda #%00000100
-	sta BYTELOC
-	jsr write_byte_SN2
 
 	lda #0
 	sta DATALOC
@@ -89,19 +79,23 @@ SN_set_vol:
 	sec
 	sbc #3 ; turns the channel number into the number on a single SN chip
 	jsr mod4
+	; Now acc has the 2-bit channel number (D6, D5), and we shift it into the proper position
+	; We use asl instead of rol, beacuse then we dont have to worry about the carry being put into bit 0
+	asl
+	asl
+	asl
+	asl
+	asl
+	ora #%10010000 ; Here we add the proper D7 1, and the register type bit (D4) 1 for volume
+	and #%11110000 ; and ensure it only takes up the first four bits (maybe not needed but i want to be safe, it costs 2 bytes and 2 cycles)
 	sta $0000
-	clc
-	adc $0000 ; add the acc value back to itself to double it
-	adc #1 ; add one to swap from freq register to vol register
+	; Now Memlocation $0000 has the first four bits of the command
 
-	tax
-	lda REGLOOKUP,x ; gets the bit reversed version of the register in the proper location
-
-	ldx DATALOC ; loads the volume number for the offset in the lookup table
-	ora VOLLOOKUP,x ; uses that as an offset for the atten value, oring it into the propper position
+	lda DATALOC ; loads the volume (attenuation) number
+	and #%00001111 ; ensure that our volume only takes up the last four bits.
+	ora $0000 ; now we or back in the first four digits.
 	sta BYTELOC
 	jsr write_byte
-
 
 	pla
 	rts
@@ -109,7 +103,7 @@ SN_set_vol:
 SN_set_noise:
 	pha
 
-	lda %00000111 ; The register for noise control is always the same (110 -> 011)
+	lda #%11100000 ; The register for noise control is always the same (110)
 	ora DATALOC ; Then or the control values (already in place) into the a register
 	sta BYTELOC
 	jsr write_byte
@@ -154,26 +148,14 @@ write_byte_SN1:
 	;lda #$00
 	lda #SN1
 	sta AUDIOSELECT
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
+	;start a loop to wait at least 32 cycles.
+	phx ; 3
+	ldx #6 ; 2
+wait1:
+	dex ; 2
+	bne wait1 ; 3
+	plx ; 3
+
 	lda #NONE
 	;lda #$ff
 	sta AUDIOSELECT
@@ -188,26 +170,15 @@ write_byte_SN2:
 	; Pulse WEB low then back high
 	lda #SN2
 	sta AUDIOSELECT
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
+	;start a loop to wait at least 32 cycles.
+
+	phx ; 3
+	ldx #6 ; 2
+wait2:
+	dex ; 2
+	bne wait2 ; 3
+	plx ; 3
+
 	lda #NONE
 	sta AUDIOSELECT
 	; This may not be long enough, so we can add some no-ops.
@@ -221,26 +192,15 @@ write_byte_SN3:
 	; Pulse WEB low then back high
 	lda #SN3
 	sta AUDIOSELECT
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
+	
+	;start a loop to wait at least 32 cycles.
+	phx ; 3
+	ldx #6 ; 2
+wait3:
+	dex ; 2
+	bne wait3 ; 3
+	plx ; 3
+
 	lda #NONE
 	sta AUDIOSELECT
 	; This may not be long enough, so we can add some no-ops.
@@ -273,34 +233,6 @@ div_loop:
 	.org SIDMIDILOOKUP ; SID midi -> 2 byte frequency divider
 
 	.org SNMIDILOOKUP ; SN midi -> 2 byte frequency divider (in proper order)
-
-	.org REGLOOKUP ; SN register (reversed)
-	; Bit zero here is always 1, beacuse it will always be one in the byte where the register is used.
-	.byte %00000001
-	.byte %00001001
-	.byte %00000101
-	.byte %00001101
-	.byte %00000011
-	.byte %00001011
-	.byte %00000111
-	.byte %00001111
-	.org VOLLOOKUP ; SN attenuation (reversed)
-	.byte %00000000
-	.byte %10000000
-	.byte %01000000
-	.byte %11000000
-	.byte %00100000
-	.byte %10100000
-	.byte %01100000
-	.byte %11100000
-	.byte %00010000
-	.byte %10010000
-	.byte %01010000
-	.byte %11010000
-	.byte %00110000
-	.byte %10110000
-	.byte %01110000
-	.byte %11110000
 
 	.org $fffc ; $7ffc on the eeprom
 	.word reset; puts a literal value in the binary file (or the location of a label)
