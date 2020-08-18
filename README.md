@@ -5,4 +5,4 @@ The 6502 folder contains a kicad schematic for the full computer, along with par
 
 Old test .s files may not be valid on the most recent hardware build.
 
-commands.txt contains the proper vasm commands for compiling for the 6502 computer. Vasm can be downloaded <a href="http://sun.hasenbraten.de/vasm/">here</a>
+commands.txt contains the proper vasm commands for compiling assembly files to ROM files for the 6502 microprocessor. Vasm can be downloaded <a href="http://sun.hasenbraten.de/vasm/">here</a>
